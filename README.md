@@ -34,13 +34,14 @@ The chatbot understands and can help users with **all 35+ platform features**:
 - **Subscription Awareness** - Maximize value for Basis/Premiere/Exclusive tiers
 - **Multi-Language Support** - Support for EN, ES, FR, IT, DE, NL, PT
 - **Context-Aware** - Understands user's relationship status, goals, history, subscription tier
+- **🆕 Fully Independent** - No external AI services required! Zero API costs, instant responses
 
 ## 🏗️ Architecture
 
 ### Backend
 - **Supabase Edge Function** - Serverless chatbot API endpoint
-- **AI Integration** - OpenAI GPT-4 or Anthropic Claude
-- **RAG Implementation** - Vector search for knowledge base
+- **Independent AI System** - Template-based responses with pattern matching (NO external AI required!)
+- **RAG Implementation** - Knowledge base search and retrieval
 - **Database** - Supabase PostgreSQL with pgvector
 
 ### Frontend
@@ -82,7 +83,7 @@ The chatbot understands and can help users with **all 35+ platform features**:
 
 - Node.js 18+
 - Supabase account and project
-- OpenAI API key or Anthropic API key
+- **No external AI API keys needed!** The chatbot operates independently
 
 ### Installation
 
@@ -101,9 +102,7 @@ The chatbot understands and can help users with **all 35+ platform features**:
    ```
    NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-   OPENAI_API_KEY=your_openai_key
-   # or
-   ANTHROPIC_API_KEY=your_anthropic_key
+   # No AI API keys needed! The chatbot is fully independent.
    ```
 
 5. Run database migrations:
