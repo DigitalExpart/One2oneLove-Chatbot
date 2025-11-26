@@ -5,6 +5,12 @@ import { buildContext } from "./utils/context.ts";
 import { generateIndependentResponse } from "./utils/independent-ai.ts";
 import { searchKnowledgeBase } from "./utils/rag.ts";
 import { getPlatformConfig } from "./utils/platform.ts";
+import { 
+  analyzeConversation, 
+  storeQueryPattern, 
+  getBestQueryPattern,
+  autoUpdateKnowledgeBase 
+} from "./utils/rag-learning.ts";
 
 const SYSTEM_PROMPT = `You are One2One Love AI, a warm, empathetic, relationship-support chatbot embedded inside the One2One Love platform. You assist couples with emotional connection, communication, activities, personal growth, and feature navigation. Your core roles:
 
@@ -150,6 +156,9 @@ serve(async (req) => {
     // Build user context (subscription, goals, milestones, etc.)
     const userContext = await buildContext(supabase, userId);
 
+    // Try to get best matching query pattern first (learned from past conversations)
+    const bestPattern = await getBestQueryPattern(supabase, message, platformId, language);
+    
     // Search knowledge base for relevant context (RAG) - filtered by platform
     const knowledgeContext = await searchKnowledgeBase(supabase, message, language, platformId);
 
@@ -188,6 +197,36 @@ serve(async (req) => {
         .eq("id", conversation_id);
     }
 
+    // RAG Self-Learning: Analyze conversation and learn from it (async, don't block response)
+    // Store query pattern for future matching
+    const queryCategory = classifyQueryForLearning(message);
+    storeQueryPattern(supabase, message.toLowerCase().trim(), queryCategory, platformId, language)
+      .catch(err => console.error("Error storing query pattern:", err));
+    
+    // Analyze conversation after a few messages (to learn patterns)
+    if (conversationHistory.length >= 3) {
+      analyzeConversation(supabase, conversation_id, platformId)
+        .then(analysis => {
+          if (analysis?.queryPattern) {
+            // Store as learning insight
+            storeQueryPattern(supabase, analysis.queryPattern, analysis.category || "general", platformId, language)
+              .catch(err => console.error("Error storing learning insight:", err));
+          }
+        })
+        .catch(err => console.error("Error analyzing conversation:", err));
+    }
+
+    // Periodically auto-update knowledge base (every 10th conversation)
+    if (Math.random() < 0.1) {
+      autoUpdateKnowledgeBase(supabase, platformId, 0.7)
+        .then(count => {
+          if (count > 0) {
+            console.log(`Auto-updated ${count} knowledge base entries`);
+          }
+        })
+        .catch(err => console.error("Error auto-updating knowledge base:", err));
+    }
+
     // Return response
     return new Response(
       JSON.stringify({
@@ -217,4 +256,29 @@ serve(async (req) => {
     );
   }
 });
+
+// Helper function to classify query for learning
+function classifyQueryForLearning(message: string): string {
+  const lower = message.toLowerCase();
+  
+  if (lower.includes("how") || lower.includes("help") || lower.includes("guide")) {
+    return "feature_help";
+  }
+  if (lower.includes("advice") || lower.includes("problem") || lower.includes("issue") || 
+      lower.includes("communication") || lower.includes("argue") || lower.includes("fight")) {
+    return "relationship_advice";
+  }
+  if (lower.includes("date") || lower.includes("activity") || lower.includes("idea")) {
+    return "date_ideas";
+  }
+  if (lower.includes("subscription") || lower.includes("plan") || lower.includes("tier")) {
+    return "subscription_info";
+  }
+  if (lower.includes("poem") || lower.includes("note") || lower.includes("message") || 
+      lower.includes("write") || lower.includes("create")) {
+    return "content_generation";
+  }
+  
+  return "general";
+}
 

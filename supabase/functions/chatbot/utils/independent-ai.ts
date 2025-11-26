@@ -1,8 +1,10 @@
 // Independent AI Response Generator
 // Generates responses without external AI services
 // Uses knowledge base, templates, and pattern matching
+// Enhanced with RAG learning capabilities
 
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.38.0";
+import { getBestQueryPattern } from "./rag-learning.ts";
 
 interface IndependentResponse {
   content: string;
@@ -397,7 +399,16 @@ export async function generateIndependentResponse(
   context: QueryContext,
   supabase: SupabaseClient
 ): Promise<IndependentResponse> {
-  const queryType = classifyQuery(context.message);
+  // Try to get learned query pattern first (from RAG learning system)
+  const learnedCategory = await getBestQueryPattern(
+    supabase,
+    context.message,
+    null, // platformId - will be set by caller if needed
+    context.language
+  );
+  
+  // Use learned category if available, otherwise classify
+  const queryType = learnedCategory || classifyQuery(context.message);
   
   // Try to get response from knowledge base first
   let knowledgeResponse = generateFromKnowledgeBase(context.knowledgeContext, context.message);
