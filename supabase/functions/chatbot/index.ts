@@ -2,9 +2,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.0";
 import { buildContext } from "./utils/context.ts";
-import { getAIResponse } from "./utils/ai.ts";
+import { generateIndependentResponse } from "./utils/independent-ai.ts";
 import { searchKnowledgeBase } from "./utils/rag.ts";
-import { getPlatformConfig, buildPlatformSystemPrompt } from "./utils/platform.ts";
+import { getPlatformConfig } from "./utils/platform.ts";
 
 const SYSTEM_PROMPT = `You are One2One Love AI, a warm, empathetic, relationship-support chatbot embedded inside the One2One Love platform. You assist couples with emotional connection, communication, activities, personal growth, and feature navigation. Your core roles:
 
@@ -153,21 +153,17 @@ serve(async (req) => {
     // Search knowledge base for relevant context (RAG) - filtered by platform
     const knowledgeContext = await searchKnowledgeBase(supabase, message, language, platformId);
 
-    // Build platform-specific system prompt
-    const platformSystemPrompt = buildPlatformSystemPrompt(platformConfig, SYSTEM_PROMPT);
-
-    // Build full context for AI
-    const fullContext = {
-      systemPrompt: platformSystemPrompt,
-      userContext,
+    // Build query context for independent response generation
+    const queryContext = {
+      message,
       knowledgeContext,
+      userContext,
       conversationHistory,
       language,
-      platformName: platformConfig?.name || "the platform",
     };
 
-    // Get AI response
-    const aiResponse = await getAIResponse(fullContext, message);
+    // Generate independent response (no external AI required)
+    const aiResponse = await generateIndependentResponse(queryContext, supabase);
 
     // Save assistant message
     const { error: assistantError } = await supabase
@@ -177,8 +173,7 @@ serve(async (req) => {
         role: "assistant",
         content: aiResponse.content,
         metadata: {
-          model: aiResponse.model,
-          tokens: aiResponse.tokens,
+          model: "independent-ai",
           features_suggested: aiResponse.featuresSuggested || [],
         },
       });

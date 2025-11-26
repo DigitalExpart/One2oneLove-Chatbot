@@ -16,11 +16,25 @@ export async function searchKnowledgeBase(
     // 2. Use vector similarity search
     // 3. Return top matching knowledge base entries
 
+    // Extract keywords from query for better matching
+    const keywords = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+    const searchTerms = keywords.slice(0, 3); // Use top 3 keywords
+    
+    // Build search query - search in both title and content
     let queryBuilder = supabase
       .from("chatbot_knowledge")
       .select("title, content, content_type")
-      .or(`metadata->>'language' eq. ${language}, metadata->>'language' is null`)
-      .ilike("content", `%${query}%`);
+      .or(`metadata->>'language' eq. ${language}, metadata->>'language' is null`);
+    
+    // Search in title or content for any of the keywords
+    if (searchTerms.length > 0) {
+      const searchConditions = searchTerms.map(term => 
+        `title.ilike.%${term}%,content.ilike.%${term}%`
+      ).join(',');
+      queryBuilder = queryBuilder.or(searchConditions);
+    } else {
+      queryBuilder = queryBuilder.ilike("content", `%${query}%`);
+    }
 
     // Filter by platform: include platform-specific or global (null) entries
     if (platformId) {
@@ -41,10 +55,13 @@ export async function searchKnowledgeBase(
       return "";
     }
 
-    // Format results as context
+    // Format results as context with more detail
     const context = results
-      .map((r) => `[${r.content_type}] ${r.title}: ${r.content.substring(0, 200)}...`)
-      .join("\n\n");
+      .map((r) => {
+        const contentPreview = r.content.length > 300 ? r.content.substring(0, 300) + '...' : r.content;
+        return `**${r.title}** (${r.content_type}):\n${contentPreview}`;
+      })
+      .join("\n\n---\n\n");
 
     return context;
   } catch (error) {
